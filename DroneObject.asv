@@ -1,0 +1,108 @@
+classdef DroneObject <handle
+    properties (SetAccess =public)
+       DroneID
+       Latitude
+       Longitude
+       
+   end 
+   properties (SetAccess =private)
+       Route
+       Params
+       Bearing
+       ReachedLastPoint =0;
+       Active=0;
+       
+   end
+   
+   methods
+       % This function is to acquire the unique path 
+       function AcquireDroneRoute(thisDrone,RoutePath)
+          thisDrone.Route=RoutePath; 
+       end       
+       % This function is to extract the current position of the drone to
+       % work with other methods
+       function [lat, lon]=GetCurrentPosition(thisDrone)
+           % If initialising, set the position of the drone to the first
+           % element on the path
+           if thisDrone.Latitude== null && thisDrone.Longitude==null
+               thisDrone.Latitude=thisDrone.Route([1,1]);
+               thisDrone.Longitude=thisDrone.Route([1,2]);
+           else
+               % Extract last saved position
+               lat=thisDrone.Latitude;
+               lon=thisDrone.Longitude;
+           end
+       end
+       % This function is to save the new position of the drone to update
+       % the posittion of the drone
+       function SetCurrentPosition(thisDrone,lat,lon)
+           thisDrone.Latitude=lat;
+           thisDrone.Longitude=lon;
+       end
+       % This function is to set the drone to active so that it will move
+       % according to the schedule
+       function SetDroneActive(thisDrone)
+           thisDrone.Active=1;
+       end
+       % This function is to set the drone to be inactive at any point
+       % (reached end of route/ rerouted, etc)
+       function SetDroneInactive(thisDrone)
+           thisDrone.Active=0;
+       end
+       % This function is to signal to the scheduler that this drone has
+       % reached the end of its route and is no longer active.
+       function SetReachedTrue(thisDrone)
+           thisDrone.ReachedLastPoint=1;
+           SetDroneInactive(thisDrone);
+       end
+       % This function is to get the maximum speed of the drone
+       function GetDroneParams(thisDrone,parameters)
+           thisDrone.Params=parameters;
+       end
+       % This function is to calculate the distance between waypoints;
+       % lat_1, lat_2, lon_1, lon_2. This can be used for calculating the
+       % distance between this drone and other drones as well as the
+       % distance between this drone and the next waypoint in the route
+       function [delta_dist]=CalculateHaversineDistance(thisDrone,otherWaypoint)
+           long=deg2rad(lon,otherWaypoint.lon);
+           lati=deg2rad(lat,otherWaypoint.lat);
+           dlat=diff(lati);
+           dlon=diff(long);
+           a=sin(dlat/2).^2+cos(lati(1:end-1)).*cos(lati(2:end-1)).*sin(dlon/2).^2;
+           c=2*atan2(sqrt(a),sqrt(1-a));
+           R=6371000;% radius of Earth in metres
+           delta_dist=R.*c;
+       end
+       % This function sets the current bearing of the drone 
+       function SetDroneBearing(thisDrone,drone_bearing_deg)
+           thisDrone.bearing =drone_bearing_deg;
+       end
+       % This function calculates the current bearing of the drone relative
+       % to the other waypoint being compared to. This can be another drone
+       % or the next waypoint in the route.
+       function [drone_bearing]=CalculateDroneBearing(thisDrone,otherWaypoint)
+           long=deg2rad(lon,otherWaypoint.lon);
+           lati=deg2rad(lat,otherWaypoint.lat);
+           dlon=diff(long);
+           drone_bearing=atan2(sin(dlon).*cos(lati(2)),cos(lati(1)).*sin(lati(2))-sin(lati(1)).*cos(lati(2)).*cos(dlon));%keep in rad for calc
+           SetDroneBearing(thisDrone,rad2deg(drone_bearing));
+       end
+       function CalculateDroneNextPosition(thisDrone,drone_bearing,max_speed)
+          lon_rad=deg2rad(lon);
+          lat_rad=deg2rad(lat);
+          R=6371000; %Earth's Radius in meters
+          d=(max_speed*1)/R;
+          new_lat=asin(sin(lat_rad)*cos(d)+cos(lat_rad)*sin(d)*cos(drone_bearing));
+          new_lon=lon_rad+atan2(sin(drone_bearing).*sin(d).*cos(lat_rad),cos(d)-sin(lat_rad).*sin(new_lat));
+          SetDronePosition();
+       end
+
+   end
+   
+   events
+       
+       
+   end
+    
+    
+end
